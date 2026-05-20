@@ -1,248 +1,435 @@
 # HRIBlossom
 
-HRIBlossom is a research platform for controlling **Blossom** — a soft, expressive robot designed for Human-Robot Interaction (HRI) research. Blossom has five motors (called *degrees of freedom*): three tower joints, a rotating base, and movable ears. You can bring Blossom to life through a visual drag-and-drop interface, a terminal, a chatbot, or your own webcam.
+HRIBlossom is a Human-Robot Interaction (HRI) research platform for controlling **Blossom**, a soft expressive robot with five motorized degrees of freedom: three tower joints, a rotating base, and movable ears. The project supports robot control through a terminal CLI, a web API, a visual Blockly-style frontend, a chatbot, webcam-based facial emotion recognition, webcam-based hand gesture recognition, and a final combined multimodal emotion-recognition system.
 
-> **No robot? No problem.** Every application automatically falls back to **simulation mode** when Blossom is not physically connected. You can develop, test, and explore all features without any hardware.
+The final project version adds a **single combined emotion interaction app** that uses three possible emotion sources:
+
+1. **Facial expression recognition** from the webcam.
+2. **Hand gesture recognition** from the webcam.
+3. **Conversation emotion detection** from voice or typed text.
+
+The app fuses any available source or combination of sources into one final target emotion:
+
+- `happy`
+- `sad`
+- `angry`
+
+> **No robot? No problem.** Most applications fall back to simulation mode if Blossom is not physically connected. You can still test the chatbot, camera pipelines, recognition models, and sequence logic without hardware.
 
 ---
 
 ## Table of Contents
 
-1. [How It Works](#how-it-works)
-2. [Prerequisites](#prerequisites)
-3. [Forking and Getting the Project Files](#forking-and-getting-the-project-files)
-4. [Python Environment Setup](#python-environment-setup)
-5. [Hardware Setup (Optional)](#hardware-setup-optional)
-6. [OpenAI API Key (Chat Only)](#openai-api-key-chat-only)
-7. [Running the Applications](#running-the-applications)
-   - [Visual Frontend + Web API](#1-visual-frontend--web-api-recommended-starting-point)
-   - [Terminal CLI](#2-terminal-cli)
-   - [Text Chatbot](#3-text-chatbot)
-   - [Voice Chatbot](#4-voice-chatbot)
-   - [Facial Emotion Recognition](#5-facial-emotion-recognition)
-   - [Hand Gesture Recognition](#6-hand-gesture-recognition)
-   - [Reset Position Editor](#7-reset-position-editor)
-8. [Project Structure](#project-structure)
-9. [Troubleshooting](#troubleshooting)
+1. [Project Overview](#project-overview)
+2. [Final Project Features](#final-project-features)
+3. [How the Final System Works](#how-the-final-system-works)
+4. [Prerequisites](#prerequisites)
+5. [Getting the Project Files](#getting-the-project-files)
+6. [Python Environment Setup](#python-environment-setup)
+7. [Environment Variables](#environment-variables)
+8. [Hardware Setup](#hardware-setup)
+9. [Running the Final Combined System](#running-the-final-combined-system)
+10. [Running the Individual Applications](#running-the-individual-applications)
+11. [Training the Models](#training-the-models)
+12. [Project Structure](#project-structure)
+13. [Important Code Corrections and Project Changes](#important-code-corrections-and-project-changes)
+14. [Known Issues and Limitations](#known-issues-and-limitations)
+15. [Troubleshooting](#troubleshooting)
 
 ---
 
-## How It Works
+## Project Overview
 
-HRIBlossom is a **monorepo** — a single folder containing several independent sub-projects that all work together to drive the same robot.
+HRIBlossom is a monorepo containing several independent sub-projects that share the same core robot-control library. Each app can use the same sequence files, robot configuration, model files, and communication utilities.
 
 ```mermaid
 flowchart TD
-    FE["frontend/\nVisual Block UI\n(browser)"]
-    WEB["apps/web/\nREST API\n(FastAPI)"]
-    CLI["apps/cli/\nTerminal REPL"]
-    CHAT["apps/chat/\nLLM Chatbot\n(text + voice)"]
-    FACE["apps/facial_recognition/\nWebcam Emotion Detection"]
-    GEST["apps/gesture_recognition/\nWebcam Gesture Detection"]
-    SHARED["apps/shared/\nCore Library"]
-    SEQ["sequences/\nJSON Animations"]
-    MODELS["models/\nTFLite ML Models"]
-    ROBOT["Blossom Robot\n(USB / Simulation)"]
+    FINAL["apps/combined_recognition\nFinal Multimodal HRI App"]
+    FACE["apps/facial_recognition\nFacial Emotion Recognition"]
+    GEST["apps/gesture_recognition\nHand Gesture Recognition"]
+    CHAT["apps/chat\nText + Voice Chat"]
+    WEB["apps/web\nFastAPI Backend"]
+    CLI["apps/cli\nTerminal Interface"]
+    FRONTEND["frontend\nVisual Blockly UI"]
+    SHARED["apps/shared\nRobot + Sequence + Fusion Utilities"]
+    MODELS["models\nTFLite Models + Shared Emotion State"]
+    SEQ["sequences\nRobot Motion JSON Files"]
+    ROBOT["Blossom Robot\nUSB or Simulation"]
 
-    FE -->|HTTP| WEB
-    WEB --> SHARED
-    CLI --> SHARED
-    CHAT --> SHARED
+    FINAL --> FACE
+    FINAL --> GEST
+    FINAL --> CHAT
+    FINAL --> SHARED
     FACE --> SHARED
     GEST --> SHARED
-    SHARED --> SEQ
+    CHAT --> SHARED
+    WEB --> SHARED
+    CLI --> SHARED
+    FRONTEND --> WEB
     SHARED --> MODELS
+    SHARED --> SEQ
     SHARED --> ROBOT
 ```
 
-| Sub-project | What it does |
+| Component | Purpose |
 |---|---|
-| `apps/web` | FastAPI server that exposes a REST API for robot control |
-| `apps/cli` | Simple terminal interface to list and play animations |
-| `apps/chat` | GPT-4o-mini chatbot that makes Blossom react emotionally (text or voice) |
-| `apps/facial_recognition` | Webcam pipeline: detects your facial expression → plays a matching animation |
-| `apps/gesture_recognition` | Webcam pipeline: detects your hand gesture → plays a matching animation |
-| `apps/shared` | Core library shared by all Python apps (robot driver, sequence loader, ML classifier) |
-| `frontend` | Browser-based drag-and-drop block editor for creating new animations |
+| `apps/combined_recognition` | Final project app combining face, hand gesture, and conversation emotion detection. |
+| `apps/facial_recognition` | Webcam-based facial emotion recognition. |
+| `apps/gesture_recognition` | Webcam-based hand gesture recognition. |
+| `apps/chat` | Text and voice chatbot utilities, including conversation emotion detection. |
+| `apps/shared` | Robot driver, sequence utilities, TFLite classifier wrapper, emotion fusion, shared emotion state. |
+| `apps/web` | FastAPI backend for robot control. |
+| `apps/cli` | Terminal app for listing and playing sequences. |
+| `frontend` | Visual block-based interface for creating and playing sequences. |
+| `models` | Trained `.tflite` models and generated shared state files. |
+| `sequences` | JSON motion sequences for Blossom. |
+
+---
+
+## Final Project Features
+
+The final project adds a multimodal emotion-aware HRI pipeline that lets Blossom respond to the user using multiple signals at once.
+
+### Final App Capabilities
+
+The final app is:
+
+```powershell
+uv run python -m apps.combined_recognition.main
+```
+
+It provides:
+
+- A live camera window.
+- Face landmark detection and facial emotion classification.
+- Hand landmark detection and gesture classification.
+- Hold-to-talk voice input using the space bar.
+- A popup text chat window opened with Enter.
+- Conversation emotion detection from both spoken and typed messages.
+- Real-time emotion fusion from any available source.
+- Robot sequence triggering based on the final emotion.
+- Simulation mode if the physical robot is unavailable.
+
+### Controls
+
+| Control | Action |
+|---|---|
+| Hold `SPACE` | Record voice input. |
+| Release `SPACE` | Transcribe the recorded voice and send it to the chatbot. |
+| Press `ENTER` | Open the text chat popup. |
+| Type in popup + press `ENTER` | Send a typed chat message. |
+| Close popup | Return to camera and voice mode. |
+| Press `q` in camera window | Quit the app. |
+
+### Emotion Sources
+
+The final app can work with any of these sources:
+
+| Source | Description |
+|---|---|
+| Facial expression | Webcam face mesh landmarks are classified by `emotion_classifier.tflite`. |
+| Hand gesture | Webcam hand landmarks are classified by `gesture_classifier.tflite`. |
+| Conversation | Spoken or typed language is classified into `happy`, `sad`, or `angry`. |
+
+The final emotion is **not contingent on all three sources being present**. The system automatically reweights the available sources.
+
+| Available Sources | Fusion Behavior |
+|---|---|
+| Face only | Face = 100% |
+| Gesture only | Gesture = 100% |
+| Conversation only | Conversation = 100% |
+| Face + gesture | Face = 50%, gesture = 50% |
+| Face + conversation | Face = 50%, conversation = 50% |
+| Gesture + conversation | Gesture = 50%, conversation = 50% |
+| Face + gesture + conversation | Each source = 33.3% |
+
+---
+
+## How the Final System Works
+
+The final app performs one continuous loop:
+
+1. Capture the current camera frame.
+2. Run MediaPipe Face Mesh on the frame.
+3. Run MediaPipe Hands on the frame.
+4. Convert detected landmarks into normalized keypoint features.
+5. Run the facial and gesture `.tflite` classifiers when those features are available.
+6. Listen for user voice input through hold-to-talk.
+7. Open the text popup when Enter is pressed.
+8. Detect conversation emotion from typed or spoken input.
+9. Fuse any available emotion sources into one final emotion.
+10. Trigger a robot sequence if a physical Blossom is connected and the confidence threshold is met.
+
+### Target Emotions
+
+The final fusion system uses:
+
+```text
+happy
+sad
+angry
+```
+
+The current facial model originally recognizes:
+
+```text
+happy
+sad
+neutral
+surprised
+```
+
+Because the facial model does not currently include an explicit `angry` class, anger is mainly detected through the gesture classifier and conversation emotion detector. Future improvements should retrain the facial model with an angry class.
 
 ---
 
 ## Prerequisites
 
-You will need three tools installed before running HRIBlossom. Follow the steps below in order.
+Install the following tools before running HRIBlossom.
 
 ### 1. Python 3.12
 
-1. Go to [https://www.python.org/downloads/](https://www.python.org/downloads/)
-2. Click **Download Python 3.12.x** (the yellow button)
-3. Run the installer
-4. **Important:** On the first screen, tick the checkbox **"Add python.exe to PATH"** before clicking Install Now
-5. Once installed, open **PowerShell** (press `Win + R`, type `powershell`, press Enter) and verify:
-   ```powershell
-   python --version
-   ```
-   You should see something like `Python 3.12.x`.
+1. Download Python 3.12 from [https://www.python.org/downloads/](https://www.python.org/downloads/).
+2. Run the installer.
+3. Check **Add python.exe to PATH** before installing.
+4. Verify in PowerShell:
 
-### 2. uv (Python package manager)
+```powershell
+python --version
+```
 
-`uv` is a fast tool that manages Python dependencies for this project. Install it by running this single command in PowerShell:
+Expected output:
+
+```text
+Python 3.12.x
+```
+
+### 2. uv
+
+`uv` manages the Python environment.
+
+Install it in PowerShell:
 
 ```powershell
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-Close and reopen PowerShell after it finishes, then verify:
+Close and reopen PowerShell, then verify:
 
 ```powershell
 uv --version
 ```
 
-### 3. Node.js (for the Visual Frontend only)
+### 3. Git
 
-You only need this if you plan to use the browser-based visual interface.
+Install Git from [https://git-scm.com/download/win](https://git-scm.com/download/win).
 
-1. Go to [https://nodejs.org/](https://nodejs.org/)
-2. Click the **LTS** download button
-3. Run the installer with all default settings
-4. Verify in PowerShell:
-   ```powershell
-   node --version
-   npm --version
-   ```
+Verify:
 
-### 4. Git (for forking and cloning the repository)
+```powershell
+git --version
+```
 
-Git is a version control tool that lets you download the project and track any changes you make to it.
+### 4. Node.js
 
-1. Go to [https://git-scm.com/download/win](https://git-scm.com/download/win)
-2. The download should start automatically — run the installer
-3. Accept all default settings on every screen and click **Next** through to the end
-4. Verify in a **new** PowerShell window:
-   ```powershell
-   git --version
-   ```
+Node.js is only required for the visual frontend.
+
+Install the LTS version from [https://nodejs.org/](https://nodejs.org/).
+
+Verify:
+
+```powershell
+node --version
+npm --version
+```
+
+> Note: Node.js installation may require multiple attempts depending on machine permissions, PATH updates, and whether PowerShell was reopened after installation.
 
 ---
 
-## Forking and Getting the Project Files
+## Getting the Project Files
 
-### What is a fork?
-
-A **fork** is your own personal copy of this project on GitHub. Forking lets you freely make changes, add features, or experiment without affecting the original project. It is the recommended way to work with HRIBlossom if you intend to customise anything.
-
-> You will need a free GitHub account to fork. Sign up at [https://github.com](https://github.com) if you don't have one.
-
-### Step 1 — Fork the repository on GitHub
-
-1. Open the HRIBlossom repository page on GitHub in your browser
-2. Click the **Fork** button near the top-right of the page
-3. On the next screen, leave all settings as-is and click **Create fork**
-4. GitHub will create a copy of the project under your own account (e.g. `https://github.com/your-username/HRIBlossom`)
-
-### Step 2 — Clone your fork to your computer
-
-"Cloning" downloads your forked copy to your machine so you can run and edit it.
-
-1. On your forked repository page, click the green **Code** button
-2. Make sure **HTTPS** is selected, then click the copy icon to copy the URL (it looks like `https://github.com/your-username/HRIBlossom.git`)
-3. Open PowerShell, navigate to where you want the project folder to live, then run:
-   ```powershell
-   cd C:\Research
-   git clone https://github.com/your-username/HRIBlossom.git
-   ```
-   Replace the URL with the one you copied. This creates an `HRIBlossom` folder at `C:\Research\HRIBlossom`.
-
-4. Navigate into the project:
-   ```powershell
-   cd HRIBlossom
-   ```
-
-### Saving your changes
-
-After editing any files, you can save a snapshot of your work with:
+### Clone the repository
 
 ```powershell
-git add .
-git commit -m "Describe what you changed here"
-git push
+git clone https://github.com/your-username/HRIBlossom.git
+cd HRIBlossom
 ```
 
-This uploads your changes back to your fork on GitHub so they are backed up and shareable.
-
----
-
-### Already have the folder on your machine?
-
-If the project folder already exists on your disk (e.g. it was shared as a ZIP), simply open PowerShell and navigate to it:
+If the folder already exists, navigate to it:
 
 ```powershell
-cd "C:\Research\HRIBlossom"
+cd "C:\Users\your-username\Documents\GitHub\HRIBlossom"
 ```
 
-> All commands in this README must be run from the **project root** (`HRIBlossom/`) unless stated otherwise.
+All commands in this README assume you are running them from the project root:
+
+```text
+HRIBlossom/
+```
 
 ---
 
 ## Python Environment Setup
 
-Run this command once from the project root to install all Python dependencies:
+Run:
 
 ```powershell
 uv sync
 ```
 
-This creates a self-contained virtual environment (`.venv/`) inside the project folder and installs every library the project needs (FastAPI, LangChain, OpenCV, MediaPipe, pypot, TensorFlow, etc.) exactly as specified in `uv.lock`. Nothing is installed globally on your machine.
+This creates the `.venv/` virtual environment and installs the locked dependencies.
 
-After this completes, you are ready to run any of the Python applications.
+### Required MediaPipe Version
+
+For the final project, the working MediaPipe version is:
+
+```powershell
+uv add mediapipe==0.10.14
+```
+
+This is important because newer dependency combinations caused the following issue:
+
+```text
+AttributeError: module 'mediapipe' has no attribute 'solutions'
+```
+
+Verify MediaPipe after installation:
+
+```powershell
+uv run python -c "import mediapipe as mp; print(mp.__version__); print(mp.solutions.face_mesh); print(mp.solutions.hands)"
+```
+
+Expected version:
+
+```text
+0.10.14
+```
+
+### AutoGen Dependency Note
+
+AutoGen was tested as a possible emotion-detection agent, but it introduced a dependency conflict with MediaPipe because AutoGen required `protobuf 5.x`, while `mediapipe==0.10.14` required `protobuf <5`. For this project, MediaPipe is required for face and hand recognition, so AutoGen was removed and conversation emotion detection was implemented as a direct OpenAI-based agent wrapper.
+
+If AutoGen was previously installed, remove it:
+
+```powershell
+uv remove autogen-agentchat autogen-ext
+uv add mediapipe==0.10.14
+```
 
 ---
 
-## Hardware Setup (Optional)
+## Environment Variables
 
-If you have a physical Blossom robot:
+Create a file named `.env` in the project root:
 
-1. Connect Blossom to your computer via USB
-2. On Windows, it will appear as serial port **COM3** in Device Manager
-3. That's all — the software will detect it automatically on startup
+```text
+HRIBlossom/.env
+```
 
-If Blossom is **not** connected, every application prints a notice and continues in simulation mode. All sequences, the chatbot, and the frontend work identically in simulation — motor commands are simply logged instead of sent to hardware.
+Use the following environment values:
 
----
+```env
+OPENAI_API_KEY="API KEY from Dr Berry"
+GROQ_API_KEY="APY KEY from https://console.groq.com/home"
+```
 
-## OpenAI API Key (Chat Only)
-
-The chatbot (`apps/chat`) uses OpenAI's GPT-4o-mini model. You need an API key to use it. This is **not required** for any other part of the project.
-
-1. Sign up or log in at [https://platform.openai.com/](https://platform.openai.com/)
-2. Navigate to **API Keys** and create a new key
-3. In the project root, open the file named `.env` (create it if it doesn't exist) and add:
-   ```
-   OPENAI_API_KEY=sk-proj-your-key-here
-   ```
-
-> Keep this file private. It contains a secret credential.
+> Important: `.env` contains private API keys. Do not commit it to a public GitHub repository. The OpenAI key may be provided by Dr. Berry because OpenAI charges per API call. Groq can be used as a free alternative if the project is adapted to use Groq models.
 
 ---
 
-## Running the Applications
+## Hardware Setup
 
-Open a PowerShell window and navigate to the project root before running any command.
+### Power and USB Connection
+
+Blossom should not be powered only by the laptop USB connection. The laptop connection is used for communication with the board, but the laptop does not provide enough power for the robot motors. Use the proper motor power source for the robot.
+
+Correct setup:
+
+1. Connect the controller board to the laptop by USB.
+2. Power the motors using the appropriate external power connection.
+3. Confirm that the board appears as a COM port in Windows Device Manager.
+
+### COM Port Setup
+
+The COM port may differ by computer. Check Device Manager:
+
+1. Press `Win + X`.
+2. Open **Device Manager**.
+3. Expand **Ports (COM & LPT)**.
+4. Find the serial device for the Blossom controller board.
+5. Note the COM number, such as `COM3`, `COM5`, or `COM7`.
+
+Update the COM port in:
+
+```text
+apps/shared/models/robot_config.py
+```
+
+Example:
+
+```python
+PORT = "COM5"
+```
+
+If the robot is not connected, the software should continue in simulation mode.
+
+### Mechanical Notes
+
+The robot springs can fall out easily during movement or handling. If Blossom begins moving incorrectly or appears physically misaligned, inspect and reseat the springs before debugging the software.
 
 ---
 
-### 1. Visual Frontend + Web API (Recommended Starting Point)
+## Running the Final Combined System
 
-This is the main graphical interface. It requires **two** terminal windows running at the same time.
+Run:
 
-**Terminal 1 — Start the backend API:**
+```powershell
+uv run python -m apps.combined_recognition.main
+```
+
+A camera window opens and displays:
+
+- Face detection overlays.
+- Hand detection overlays.
+- Final fused emotion.
+- Source weights.
+- Conversation emotion, if available.
+- Last user message and Blossom response.
+
+### Final App Controls
+
+| Control | Action |
+|---|---|
+| Hold `SPACE` | Start recording voice. |
+| Release `SPACE` | Stop recording, transcribe speech, detect conversation emotion, send to chatbot. |
+| `ENTER` | Open text chat popup. |
+| Type in popup + `ENTER` | Send typed message. |
+| Close popup | Return to voice mode while keeping camera visible. |
+| `q` | Quit app. |
+
+### Notes
+
+- While the text popup is open, voice recording is disabled so the space bar can be used normally for typing.
+- Conversation emotion remains active for a limited time and is fused with the camera-based emotion sources.
+- If no face or hand is visible, the app can still produce a final emotion using conversation input alone.
+- If no conversation is available, the app can use face and/or gesture detection alone.
+
+---
+
+## Running the Individual Applications
+
+The final combined app is the main final project deliverable, but the original individual apps are still useful for testing.
+
+### 1. Visual Frontend + Web API
+
+Start the backend:
 
 ```powershell
 uv run uvicorn apps.web.main:app --reload --port 8000
 ```
 
-Leave this running. You should see `Application startup complete.`
-
-**Terminal 2 — Start the frontend (first time only, install dependencies):**
+In a second terminal:
 
 ```powershell
 cd frontend
@@ -250,226 +437,495 @@ npm install
 npm start
 ```
 
-Then open your browser and go to **[http://localhost:8080](http://localhost:8080)**.
+Open:
 
-**What you can do in the browser:**
-
-- Drag and drop blocks to build a robot animation sequence
-- Each **Frame** block represents a moment in time (in milliseconds)
-- Each **Set all positions** block sets the five motor values (1–5) for that moment
-- Click **Play Sequence** to send the animation to the robot
-- Click **Reset Robot** to return Blossom to its default position
-- Browse and replay previously saved sequences
-
-**Example sequence layout in the block editor:**
-
-```
-Create sequence named "wave"
-  ├─ Frame at 0 ms
-  │   └─ Set all positions (tower_1: 3, tower_2: 3, tower_3: 3, base: 3, ears: 5)
-  └─ Frame at 1000 ms
-      └─ Set all positions (tower_1: 5, tower_2: 5, tower_3: 3, base: 3, ears: 5)
+```text
+http://localhost:8080
 ```
 
----
+Known issue: dragging blocks in the visual frontend may not work, so creating new sequences from the frontend may be limited or unavailable. Existing sequences can still be used from Python.
 
 ### 2. Terminal CLI
-
-A simple keyboard-driven interface for playing animations directly from the terminal.
 
 ```powershell
 uv run python -m apps.cli.main
 ```
 
-| Key | Action |
+| Key/Input | Action |
 |---|---|
-| `l` | List all available animation sequences |
-| `s` | Play a random sequence |
-| `q` | Quit |
-| *(any name)* | Type a sequence name and press Enter to play it |
-
----
+| `l` | List available sequences. |
+| `s` | Play a random sequence. |
+| `q` | Quit. |
+| Sequence name | Play that sequence. |
 
 ### 3. Text Chatbot
-
-Talk to Blossom as a conversational AI. Blossom responds with empathetic text and automatically chooses physical animations to match the emotional tone.
-
-**Requires:** `.env` file with a valid `OPENAI_API_KEY` (see [OpenAI API Key](#openai-api-key-chat-only))
 
 ```powershell
 uv run python -m apps.chat.text
 ```
 
-Type your message and press Enter. Blossom will reply and, when appropriate, play a matching animation on the robot.
-
----
+Type a message and press Enter.
 
 ### 4. Voice Chatbot
-
-The same chatbot as above, but with speech input and spoken responses.
-
-**Requires:** `.env` file with a valid `OPENAI_API_KEY`, plus a working **microphone**.
 
 ```powershell
 uv run python -m apps.chat.voice
 ```
 
-- **Hold the Space bar** to record your voice
-- **Release Space** to send the recording
-- Your speech is transcribed by OpenAI Whisper, processed by GPT-4o-mini, and the response is spoken aloud via OpenAI TTS
-
----
+- Hold the space bar to record.
+- Release the space bar to transcribe and send.
 
 ### 5. Facial Emotion Recognition
-
-Watches your face through a webcam and triggers robot animations based on the emotion it detects.
-
-**Requires:** A working **webcam**.
 
 ```powershell
 uv run python -m apps.facial_recognition.main
 ```
 
-The app opens a webcam window showing your face with landmark overlays. When it detects an emotion with high confidence (> 70%), Blossom plays the corresponding animation. Press `q` in the webcam window to quit.
-
-**Recognized emotions and their animations:**
-
-| Detected emotion | Animation played |
-|---|---|
-| Happy | `happy_1` or `happy_10` |
-| Sad | `sad_1` |
-| Neutral / rest | `reset` |
-
----
+Press `q` in the camera window to quit.
 
 ### 6. Hand Gesture Recognition
-
-Watches your hands through a webcam and triggers robot animations based on your gesture.
-
-**Requires:** A working **webcam**.
 
 ```powershell
 uv run python -m apps.gesture_recognition.main
 ```
 
-Hold your hand up to the camera. When a gesture is recognized, Blossom plays the matching animation. Press `q` in the webcam window to quit.
-
-**Recognized gestures and their animations:**
-
-| Gesture | Animation played |
-|---|---|
-| Thumbs up | `happy_sequence` |
-| Peace sign (V) | `yes_sequence` |
-| Closed fist | `anger_sequence` |
-| Open palm | `happy_sequence` |
-
----
+Press `q` in the camera window to quit.
 
 ### 7. Reset Position Editor
-
-An interactive terminal tool for configuring the robot's default resting position. Use this if Blossom's rest pose needs adjusting after assembly.
 
 ```powershell
 uv run python reset.py
 ```
 
-Use the **arrow keys** to select a motor and adjust its position (scale 0–10). The change can be previewed live on the real robot if connected. Press `s` to save the new reset position to `sequences/reset_sequence.json`.
+Use this if the robot's rest pose needs adjustment.
+
+---
+
+## Training the Models
+
+The `.tflite` models must exist in the `models/` directory.
+
+If the directory does not exist, create it:
+
+```powershell
+mkdir models
+```
+
+### Train Gesture Recognition Model
+
+Run this before running the gesture recognition app if the gesture model is missing or outdated:
+
+```powershell
+uv run python apps/gesture_recognition/train.py
+```
+
+Then run:
+
+```powershell
+uv run python -m apps.gesture_recognition.main
+```
+
+### Train Facial Recognition Model
+
+```powershell
+uv run python apps/facial_recognition/train.py
+```
+
+Then run:
+
+```powershell
+uv run python -m apps.facial_recognition.main
+```
+
+### Important Facial Training Correction
+
+The facial model originally used `StandardScaler` during training but did not apply the same scaler during live webcam inference. This caused live recognition to collapse toward one class even though the training report looked excellent. The correction was to remove `StandardScaler` from facial training so the model trains on the same normalized landmark format used at runtime.
 
 ---
 
 ## Project Structure
 
-```
+```text
 HRIBlossom/
 │
-├── apps/                          # All Python sub-applications
-│   ├── shared/                    # Core library used by all apps
-│   │   ├── models/
-│   │   │   ├── robot.py           # BlossomRobot — motor control abstraction
-│   │   │   ├── robot_config.py    # Hardware config (COM3, motor IDs)
-│   │   │   ├── sequence.py        # Loads and plays JSON animation files
-│   │   │   └── frame.py           # Single animation frame data model
+├── apps/
+│   ├── chat/
+│   │   ├── chatbot/
+│   │   │   └── agent.py
+│   │   ├── emotion_agent.py              # Conversation emotion detector
+│   │   ├── text.py
+│   │   ├── voice.py
+│   │   └── chat_ui.py                    # Optional standalone chat UI
+│   │
+│   ├── combined_recognition/
+│   │   ├── __init__.py
+│   │   └── main.py                       # Final multimodal HRI app
+│   │
+│   ├── facial_recognition/
+│   │   ├── collect_images.py
+│   │   ├── main.py
+│   │   ├── train.py
+│   │   └── csv/
+│   │
+│   ├── gesture_recognition/
+│   │   ├── collect_images.py
+│   │   ├── main.py
+│   │   ├── train.py
+│   │   └── csv/
+│   │
+│   ├── shared/
+│   │   ├── constants.py
+│   │   ├── emotion_fusion.py             # Face + gesture + conversation fusion
+│   │   ├── emotion_state.py              # Shared conversation emotion state
 │   │   ├── keypoint_classifier/
-│   │   │   └── classifier.py      # TFLite inference (emotion / gesture)
+│   │   │   └── classifier.py
+│   │   ├── models/
+│   │   │   ├── robot.py
+│   │   │   ├── robot_config.py           # COM port configuration
+│   │   │   ├── sequence.py
+│   │   │   └── frame.py
 │   │   └── utils/
-│   │       └── sequence.py        # Helpers: list sequences, get by name
+│   │       └── sequence.py
 │   │
-│   ├── web/                       # FastAPI REST API server
-│   │   └── main.py                # All API endpoints
-│   │
-│   ├── cli/                       # Terminal REPL
+│   ├── cli/
 │   │   └── main.py
 │   │
-│   ├── chat/                      # LLM chatbot (text + voice)
-│   │   ├── text.py                # Text interface entry point
-│   │   ├── voice.py               # Voice interface entry point
-│   │   └── chatbot/
-│   │       └── agent.py           # LangGraph agent (GPT-4o-mini)
-│   │
-│   ├── facial_recognition/        # Webcam facial emotion pipeline
-│   │   ├── main.py
-│   │   ├── collect_images.py      # Collect training data (for researchers)
-│   │   └── train.py               # Retrain the emotion model (for researchers)
-│   │
-│   └── gesture_recognition/       # Webcam hand gesture pipeline
-│       ├── main.py
-│       ├── collect_images.py
-│       └── train.py
+│   └── web/
+│       └── main.py
 │
-├── frontend/                      # TypeScript / Blockly visual UI
+├── frontend/
 │   ├── src/
-│   │   └── index.ts               # Main UI logic and API calls
-│   ├── package.json               # npm dependencies
-│   └── webpack.config.js          # Build configuration
+│   ├── package.json
+│   └── webpack.config.js
 │
-├── sequences/                     # 60+ pre-built JSON animation files
+├── models/
+│   ├── emotion_classifier.tflite
+│   ├── gesture_classifier.tflite
+│   └── conversation_emotion_state.json   # Generated at runtime
+│
+├── sequences/
 │   ├── happy_1.json
+│   ├── happy_10.json
 │   ├── sad_1.json
-│   ├── reset_sequence.json        # Default resting position
+│   ├── anger.json
+│   ├── reset_sequence.json
 │   └── ...
 │
-├── models/                        # Pre-trained ML models
-│   ├── emotion_classifier.tflite  # Used by facial_recognition
-│   └── gesture_classifier.tflite  # Used by gesture_recognition
-│
-├── reset.py                       # Reset position editor (TUI)
-├── pyproject.toml                 # Python project config and dependencies
-├── uv.lock                        # Locked dependency versions (do not edit)
-├── .python-version                # Specifies Python 3.12
-└── .env                           # Your secrets (OpenAI key) — not shared
+├── reset.py
+├── README.md
+├── pyproject.toml
+├── uv.lock
+├── .python-version
+└── .env
 ```
+
+---
+
+## Important Code Corrections and Project Changes
+
+This section documents the major corrections and additions made during final project development.
+
+### 1. Added Multimodal Emotion Fusion
+
+A new shared fusion module was added:
+
+```text
+apps/shared/emotion_fusion.py
+```
+
+This file combines:
+
+- Facial recognition probabilities.
+- Gesture recognition probabilities.
+- Conversation emotion classification.
+
+It automatically reweights available sources so the system works with any one, any two, or all three signals.
+
+### 2. Added Shared Conversation Emotion State
+
+A new shared state module was added:
+
+```text
+apps/shared/emotion_state.py
+```
+
+This allows chat-based emotion detection to be shared with the combined recognition app.
+
+### 3. Added Final Combined Recognition App
+
+A new final app was added:
+
+```text
+apps/combined_recognition/main.py
+```
+
+This app combines the camera pipeline, voice input, text popup, conversation emotion detection, and final fusion into one runnable file.
+
+### 4. Added Conversation Emotion Detection
+
+A conversation emotion detector was added:
+
+```text
+apps/chat/emotion_agent.py
+```
+
+It classifies user text into:
+
+```text
+happy
+sad
+angry
+```
+
+AutoGen was tested but removed because of dependency conflicts with MediaPipe. The current version uses a direct OpenAI-based classifier with a keyword fallback.
+
+### 5. Removed AutoGen Dependency
+
+AutoGen required a newer `protobuf` version that conflicted with the MediaPipe version required for the existing webcam pipelines. The correction was:
+
+```powershell
+uv remove autogen-agentchat autogen-ext
+uv add mediapipe==0.10.14
+```
+
+### 6. Corrected MediaPipe Version
+
+The project needed MediaPipe 0.10.14 so that `mp.solutions.face_mesh` and `mp.solutions.hands` were available.
+
+Verification command:
+
+```powershell
+uv run python -c "import mediapipe as mp; print(mp.__version__); print(mp.solutions.face_mesh); print(mp.solutions.hands)"
+```
+
+### 7. Fixed Facial Training / Runtime Mismatch
+
+The facial model training initially used `StandardScaler`, but runtime inference did not. The correction was to remove `StandardScaler` so training and runtime preprocessing match.
+
+### 8. Updated Sequence Names
+
+The sequence names called by gesture, facial, and final emotion outputs were updated to match available sequence JSON files. For example:
+
+| Emotion/Gesture | Sequence |
+|---|---|
+| Happy | `happy_1` or `happy_10` |
+| Sad | `sad_1` |
+| Angry | `anger` |
+| Neutral/rest | `reset` or `reset_sequence` |
+
+### 9. Added Models Directory Requirement
+
+The `models/` directory must exist before training saves `.tflite` files.
+
+```powershell
+mkdir models
+```
+
+### 10. Clarified Gesture Training Requirement
+
+The gesture app requires the gesture classifier model. If the model is missing, run:
+
+```powershell
+uv run python apps/gesture_recognition/train.py
+```
+
+before:
+
+```powershell
+uv run python -m apps.gesture_recognition.main
+```
+
+### 11. Improved Text Overlay
+
+The final app originally displayed a large black box over the camera feed. This was corrected by drawing white text with a black outline directly on the camera image.
+
+### 12. Added Text Popup Instead of Separate Chat Window Mode
+
+The final app now opens a text popup from the camera window with Enter. Closing the popup returns to voice mode while keeping the camera visible.
+
+### 13. Improved Voice Interaction
+
+Voice input is handled using hold-to-talk:
+
+- Hold space to record.
+- Release space to transcribe.
+- The spoken message is sent to the chatbot.
+- The detected conversation emotion is fused with the camera-based emotion signals.
+
+### 14. Updated README Project Structure
+
+The original README did not include the final project modules. The project structure section now includes:
+
+- `apps/combined_recognition`
+- `apps/shared/emotion_fusion.py`
+- `apps/shared/emotion_state.py`
+- `apps/chat/emotion_agent.py`
+- `models/conversation_emotion_state.json`
+
+### 15. Documented Hardware Power Limitation
+
+The laptop USB connection is not enough to power Blossom's motors. The board can be connected to the laptop for communication, but motor power must come from the correct external power source.
+
+### 16. Documented COM Port Configuration
+
+The COM port must be updated based on the board's current port in Device Manager:
+
+```text
+apps/shared/models/robot_config.py
+```
+
+---
+
+## Known Issues and Limitations
+
+### Visual Frontend Block Dragging
+
+The visual frontend may open correctly, but block dragging may not work. If blocks cannot be dragged, new sequence creation through the frontend is limited. Existing sequences can still be played through Python apps.
+
+### Node.js Installation
+
+Node.js installation may require multiple attempts. If `node` or `npm` is not recognized, reinstall Node.js, reopen PowerShell, and verify PATH configuration.
+
+### Facial Model Does Not Detect Anger
+
+The current facial model recognizes:
+
+```text
+happy
+sad
+neutral
+surprised
+```
+
+It does not directly recognize anger. Anger currently comes from gesture recognition and conversation emotion detection. Future work should retrain the facial model with an angry class.
+
+### Robot Springs
+
+The physical springs on Blossom can fall out easily, which can affect the robot's motion. Check the mechanical assembly before assuming software failure.
+
+### API Costs
+
+OpenAI calls cost money. The OpenAI API key may be provided by Dr. Berry for the course. Groq can be used as a free alternative if the chatbot and emotion detection code are adapted for Groq.
+
+### Simulation Mode
+
+Simulation mode allows software testing without hardware, but it cannot validate physical robot motion, motor load, spring behavior, or power issues.
 
 ---
 
 ## Troubleshooting
 
-**Robot not detected on startup**
-- Check the USB cable between Blossom and your computer
-- Find the COM port Blossom is using:
-  1. Press `Win + X` and click **Device Manager**
-  2. In the Device Manager window, look for the section called **Ports (COM & LPT)** and expand it
-  3. If **Ports (COM & LPT)** does not appear in the list, click the **View** menu at the top and select **Show hidden devices**, then look again
-  4. Blossom's USB adapter will appear as a device in that section — note the port number shown in parentheses, for example `COM3` or `COM5`
-- The project defaults to `COM3`. If Blossom is on a different port, open `apps/shared/models/robot_config.py` and update the port value to match (e.g. `"COM5"`)
-- If no robot is connected at all, simulation mode activates automatically — no action needed
+### `mediapipe` has no attribute `solutions`
 
-**`ModuleNotFoundError` or import errors**
-- Make sure you ran `uv sync` from the project root
-- Confirm you are running commands with `uv run python ...` and not just `python ...`
+Install the working MediaPipe version:
 
-**Frontend shows "Error connecting to robot" or can't reach the API**
-- The FastAPI server must be running in a separate terminal (`uv run uvicorn apps.web.main:app --reload --port 8000`)
-- Confirm the server started successfully (look for `Application startup complete.` in that terminal)
-- Make sure nothing else is using port 8000
+```powershell
+uv remove mediapipe
+uv add mediapipe==0.10.14
+```
 
-**Webcam does not open (facial/gesture recognition)**
-- Close any other application that might be using the camera (video calls, etc.)
-- If you have multiple cameras, the app uses the default system camera (index 0)
+Verify:
 
-**`npm` command not found**
-- Node.js was not installed or the installer did not add it to PATH
-- Re-run the Node.js installer from [https://nodejs.org/](https://nodejs.org/) and ensure you complete all steps
+```powershell
+uv run python -c "import mediapipe as mp; print(mp.__version__); print(mp.solutions.face_mesh); print(mp.solutions.hands)"
+```
 
-**Chatbot gives an authentication error**
-- Your `.env` file is missing or the `OPENAI_API_KEY` value is incorrect
-- Verify the key at [https://platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+### Dependency conflict involving AutoGen and Protobuf
+
+Remove AutoGen and reinstall MediaPipe:
+
+```powershell
+uv remove autogen-agentchat autogen-ext
+uv add mediapipe==0.10.14
+```
+
+### Robot not detected
+
+- Check USB connection.
+- Check motor power.
+- Confirm the COM port in Device Manager.
+- Update `apps/shared/models/robot_config.py`.
+- If no robot is connected, simulation mode should activate.
+
+### Webcam does not open
+
+- Close other apps using the camera.
+- Check camera permissions.
+- Make sure the app is using the correct camera index.
+- The default camera index is set in the code as:
+
+```python
+CAMERA_INDEX = 0
+```
+
+### Voice input does not work
+
+- Confirm microphone permissions.
+- Confirm `sounddevice` can access the microphone.
+- Confirm `.env` contains `OPENAI_API_KEY`.
+- Make sure the text popup is closed when using hold-to-talk.
+
+### Text popup opens but cannot type
+
+The final version uses a Tkinter `Toplevel` popup managed by the main thread. If typing still does not work, click directly inside the input field at the bottom of the popup.
+
+### Chatbot authentication error
+
+Check `.env` in the project root:
+
+```env
+OPENAI_API_KEY="API KEY from Dr Berry"
+GROQ_API_KEY="APY KEY from https://console.groq.com/home"
+```
+
+### Gesture model file missing
+
+Run:
+
+```powershell
+mkdir models
+uv run python apps/gesture_recognition/train.py
+```
+
+Then:
+
+```powershell
+uv run python -m apps.gesture_recognition.main
+```
+
+### Facial model gives one class repeatedly
+
+Make sure the facial training code does not apply `StandardScaler` unless the same scaler is also saved and applied at runtime. The corrected project removes the scaler so training and runtime use the same landmark normalization.
+
+---
+
+## Suggested Final Project Demo Procedure
+
+1. Start the final app:
+
+```powershell
+uv run python -m apps.combined_recognition.main
+```
+
+2. Show face-only emotion detection.
+3. Show hand gesture detection.
+4. Hold space and say a happy, sad, or angry sentence.
+5. Press Enter and type a message in the popup.
+6. Close the popup and return to voice mode.
+7. Demonstrate that the final emotion changes depending on available sources.
+8. Demonstrate simulation mode if the robot is not physically connected.
+
+---
+
+## Notes for Future Work
+
+Future improvements should include:
+
+- Retraining the facial model with an explicit `angry` class.
+- Improving survey-based evaluation with more participants.
+- Adding confidence calibration for each source.
+- Replacing keyword fallback with a local lightweight text emotion model.
+- Fixing frontend block dragging.
+- Improving physical robot cable and spring reliability.
+- Adding Groq support as a lower-cost alternative to OpenAI.
+- Adding persistent logs of detected emotions and robot responses.
