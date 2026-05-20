@@ -1352,6 +1352,5 @@ def main():
 
     print("Blossom combined emotion system stopped.")
 
-
 if __name__ == "__main__":
     main()
