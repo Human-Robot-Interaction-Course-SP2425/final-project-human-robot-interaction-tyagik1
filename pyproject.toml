@@ -1,0 +1,27 @@
+[project]
+name = "hriblossom"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "argparse>=1.4.0",
+    "dotenv>=0.9.9",
+    "fastapi[standard]>=0.116.1",
+    "keyboard>=0.13.5",
+    "langchain>=0.3.27",
+    "langchain-core>=0.3.75",
+    "langchain-openai>=0.3.32",
+    "langgraph>=0.6.6",
+    "mediapipe==0.10.14",
+    "numpy>=1.26.4",
+    "openai>=1.106.1",
+    "opencv-python>=4.11.0.86",
+    "pydantic>=2.11.7",
+    "pypot>=5.0.2",
+    "scikit-learn>=1.7.1",
+    "seaborn>=0.13.2",
+    "sounddevice>=0.5.2",
+    "soundfile>=0.13.1",
+    "tensorflow>=2.18.1",
+]

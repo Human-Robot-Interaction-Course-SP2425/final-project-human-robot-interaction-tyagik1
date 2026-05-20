@@ -1,0 +1,63 @@
+{
+    "animation": "reset",
+    "frame_list": [
+        {
+            "millis": 0,
+            "positions": [
+                {
+                    "dof": "tower_1",
+                    "pos": "5.10"
+                },
+                {
+                    "dof": "tower_2",
+                    "pos": "0.00"
+                },
+                {
+                    "dof": "tower_3",
+                    "pos": "3.90"
+                },
+                {
+                    "dof": "base",
+                    "pos": "3.00"
+                },
+                {
+                    "dof": "arms",
+                    "pos": "3.00"
+                },
+                {
+                    "dof": "ears",
+                    "pos": "3.00"
+                }
+            ]
+        },
+        {
+            "millis": 10,
+            "positions": [
+                {
+                    "dof": "tower_1",
+                    "pos": "5.10"
+                },
+                {
+                    "dof": "tower_2",
+                    "pos": "0.00"
+                },
+                {
+                    "dof": "tower_3",
+                    "pos": "3.90"
+                },
+                {
+                    "dof": "base",
+                    "pos": "3.00"
+                },
+                {
+                    "dof": "arms",
+                    "pos": "3.00"
+                },
+                {
+                    "dof": "ears",
+                    "pos": "3.00"
+                }
+            ]
+        }
+    ]
+}
